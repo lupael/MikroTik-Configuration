@@ -1,5 +1,5 @@
-##Provided by Greg Sowell at Greg Sowell Consulting.
-###Email: Greg@GregSowell.com HTTP: http://GregSowell.com
+##This script is exclusively prepared for SpeedLinks resellers and customers Provided by Lupael
+###Email: lupael@i4e.com.bd HTTP: https://i4e.com.bd
 #
 ##The queues are based off of a theoretical 10Mb connection.  In this way you can
 ###use the values as percentages of the whole.  The easiest thing to do is to 
@@ -17,7 +17,7 @@
 #
 ##You will also want to change the ether1 interface to whatever your WAN interface happens to be.
 #
-##As always, thank you for your business and thank you for helping to feed my kids :)
+##
  
 #Here's our l7 regex statements:
 /ip firewall layer7-protocol
