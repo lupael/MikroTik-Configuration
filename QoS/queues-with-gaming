@@ -16,7 +16,6 @@
 ###You can then appropriate the queue bandwidth as you see fit.
 #
 ##You will also want to change the ether1 interface to whatever your WAN interface happens to be.
-#
 ##
  
 #Here's our l7 regex statements:
@@ -35,6 +34,8 @@ add comment="" name=flv regexp="^.*(get|GET).+\\.flv.*\$"
 add name=video regexp="^.*(get|GET).+(\\.flv|\\.mp4|netflix|\\.swf).*\$"
  
 #Setting up our address lists
+##replace ip
+##replace ip
 /ip firewall address-list
 add address=172.22.0.0/16 comment="" disabled=no list=internal-nets
 add address=1.1.1.0/29 comment="" disabled=no list=external-nets
