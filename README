@@ -15,5 +15,5 @@ Add and schedule script to ensure mail server FQDN is resolved regularly
 Add and schedule script to ensure NTP servers FQDNs are resolved regularly
 Add and schedule script to take system backup
 Add and schedule script to run on boot to notify of reboot
-Add and schedule script to monitor PPPoE connection and restart if we are allocated an address we're not expecting (useful for UK BT based ADSL circuits where BT decide to take over the connection every now and again) (optional)
+Add and schedule script to monitor PPPoE connection and restart if we are allocated an address we're not expecting (useful for BT based ADSL circuits where BT decide to take over the connection every now and again) (optional)
 
