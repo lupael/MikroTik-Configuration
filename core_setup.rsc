@@ -1,37 +1,37 @@
 {
     #-------------------------------------------------------------------------------
     #
-    # The purpose of this script is to create a standard SOHO type
-    # configuration for ROS which can be built on by the user.
+    # The purpose of this script is to create a vlan based
+    # configuration for ROS which can be built on by this script.
     #
     #-------------------------------------------------------------------------------
     # Set the name of the router
-    :local systemName ""
+    :local systemName "ispbills"
 
     # Secure your RouterOS! Set the password you would like to use when logging on as 'admin'.
-    :local adminPassword ""
+    :local adminPassword "Admin121"
 
     # Time Servers (NTP)
     :local ntpA "173.230.149.23"
     :local ntpB "198.110.48.12"
 
     # Name Servers (DNS) - set to OpenDNS. This should be set to a set of servers that are local and FAST 
-    :local nsA "216.116.96.2"
-    :local nsB "216.52.254.33"
-    :local nsC "68.111.16.30"
+    :local nsA "8.8.8.8"
+    :local nsB "8.8.4.4"
+    :local nsC "1.1.1.1"
 
     # DHCP - Automatically set if package is installed
-    :local dhcpServer ""
-    :local lanPoolName ""
-    :local poolStart "192.168.10.100"
-    :local poolEnd "192.168.10.150"
+    #:local dhcpServer ""
+    #:local lanPoolName ""
+    #:local poolStart "192.168.10.100"
+    #:local poolEnd "192.168.10.150"
 
-    :local lanAddress "192.168.10.1"
-    :local lanNetworkAddress "192.168.10.0"
-    :local lanNetworkBits "24"
+    #:local lanAddress "192.168.10.1"
+    #:local lanNetworkAddress "192.168.10.0"
+    #:local lanNetworkBits "24"
 
     # Interfaces
-    :local ether1 "ether1-gateway"
+    :local sfp1 "sfp1"
     :local ether2 "ether2-master-local"
     :local ether3 "ether3-slave-local"
     :local ether4 "ether4-slave-local"
@@ -45,6 +45,8 @@
     # Configuration
     #
     #-------------------------------------------------------------------------------
+    :log info "--- ISPbills automation started ---";
+    :log info "--- DO NOT Power off or Cancell ---";
     :log info "--- Setting timezone ---";
     /system clock set time-zone-autodetect=yes
 
@@ -81,13 +83,11 @@
     }
 
     :log info "--- Resetting Mac Server ---";
-    /tool mac-server remove [find interface!=all]
-    /tool mac-server set [find] disabled=no
-    /tool mac-server mac-winbox remove [find interface!=all]
-    /tool mac-server mac-winbox set [find] disabled=no
+    /tool mac-server set allowed-interface-list=all
+    /tool mac-server mac-winbox set allowed-interface-list=all
 
     :log info "--- Resetting neighbor discovery ---";
-    /ip neighbor discovery set [find name=$ether1] discover=yes
+    /ip neighbor discovery-settings set discover-interface-list=all
 
     #-------------------------------------------------------------------------------
     #
@@ -101,7 +101,6 @@
     :log info "--- Reset interfaces to default ---";
     :foreach iface in=[/interface ethernet find] do={
       /interface ethernet set $iface name=[get $iface default-name]
-      /interface ethernet set $iface master-port=none
     }
 
     :log info "--- Remove old DHCP client ---";
@@ -109,17 +108,13 @@
     :if ([:len $o] != 0) do={ /ip dhcp-client remove $o }
 
     :log info "--- Setup the wired interface(s) ---";
-    /interface set ether1 name="$ether1";
+    /interface set sfp1 name="$sfp1";
 
-    :log info "--- Setting up a dhcp client on the gateway interface ---";
-    /ip dhcp-client add interface=$ether1 disabled=no comment="Gateway Interface. Connect to ISP modem." use-peer-dns=no use-peer-ntp=no add-default-route=no;
-
-    /interface ethernet {
-      set ether2 name="$ether2";
-      set ether3 name="$ether3" master-port=$ether2;
-      set ether4 name="$ether4" master-port=$ether2;
-      set ether5 name="$ether5" master-port=$ether2;
-    }
+    :log info "--- Setting up vlans on the gateway interface ---";
+    /interface vlan add interface=sfp1 name=bdix vlan-id=604
+    /interface vlan add interface=sfp1 name=fna vlan-id=603
+    /interface vlan add interface=sfp1 name=ggc vlan-id=602
+    /interface vlan add interface=sfp1 name=iig vlan-id=601
 
     #-------------------------------------------------------------------------------
     #
@@ -148,18 +143,16 @@
       :if ([:len $o] != 0) do={ remove $o }
     }
 
-    :log info "--- Setting the routers LAN address to $lanAddress/$lanNetworkBits ---";
-    /ip address add address="$lanAddress/$lanNetworkBits" interface=$ether2 network=$lanNetworkAddress comment="core router LAN address";
-
-    :log info "--- Setting DHCP server on interface, pool $poolStart-$poolEnd ---";
-    /ip pool add name=$lanPoolName ranges="$poolStart-$poolEnd";
-    /ip dhcp-server add name="$dhcpServer" address-pool=$lanPoolName interface=$ether2 disabled=no lease-time=10m;
-    /ip dhcp-server network add address="$lanNetworkAddress/$lanNetworkBits" gateway=$lanAddress dns-server=$lanAddress comment="local DHCP network";
+    :log info "--- Setting the routers IP address to vlans ---";
+    /ip address add address=172.18.203.14/30 interface=ggc network=172.18.203.12
+    /ip address add address=172.18.203.18/30 interface=fna network=172.18.203.16
+    /ip address add address=172.18.203.22/30 interface=bdix network=172.18.203.20
+    /ip address add address=103.134.31.50/30 interface=iig network=103.134.31.48
 
     :log info "--- Setting DNS servers to $nsA and $nsB ---";
     /ip dns {
       set allow-remote-requests=yes servers="$nsA,$nsB,$nsC";
-      static add name=$systemName address=$lanAddress;
+      #static add name=$systemName address=$lanAddress;
     }
 
 
@@ -170,7 +163,11 @@
     #-------------------------------------------------------------------------------
 
     :log info "--- Setting up NAT on WAN interface ---";
-    /ip firewall nat add chain=srcnat out-interface=$ether1 action=masquerade
+    /ip firewall nat {
+    add action=masquerade chain=srcnat out-interface=bdix
+    add action=masquerade chain=srcnat out-interface=ggc
+    add action=masquerade chain=srcnat out-interface=fna
+    add action=masquerade chain=srcnat out-interface=iig to-addresses=103.134.31.50 }
 
     :log info "--- Setting up simple firewall rules ---";
     /ip firewall {
@@ -186,24 +183,11 @@
     # Harden Router
     #
     #-------------------------------------------------------------------------------
-    :log info "--- Disabling neighbor discovery ---";
-    /ip neighbor discovery set [find name="ether1-gateway"] discover=no;
+    :log info "--- Enable neighbor discovery ---";
+    /ip neighbor discovery-settings set discover-interface-list=all
 
     :log info "--- Disabling bandwidth test server ---";
     /tool bandwidth-server set enabled=no;
-
-    :log info "--- Disabling router services ---";
-    /ip service {
-      :foreach s in=[find where !disabled and name!=telnet and name!=winbox] do={
-        set $s disabled=yes;
-      }
-
-      :log info "--- Enabling secure shell service on port  ---";
-      :local o [find name=ssh !disabled]
-      :if ([:len $o] = 0) do={
-        set ssh disabled=no port=$sshPort;
-      }
-    }
 
     :log info "--- Disabling firewall service ports ---";
     /ip firewall service-port {
@@ -213,12 +197,9 @@
     }
 
     :log info "--- Disable mac server tools ---";
-    /tool mac-server disable [find];
-    /tool mac-server mac-winbox disable [find];
-
     :log info "Auto configuration ended.";
     :put "";
     :put "Auto configuration ended. Please check the system log.";
-
+    /file remove [/file find name=(core_setup.rsc)]
     /system reboot;
 }
